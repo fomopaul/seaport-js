@@ -379,7 +379,7 @@ export class Seaport {
   ): TransactionMethods<ContractMethodReturnType<SeaportContract, "cancel">> {
     const signer = this.provider.getSigner(accountAddress);
 
-    return getTransactionMethods(this.contract.connect(signer), "cancel", [
+    return getTransactionMethods(this.wallet?this.contract:this.contract.connect(signer), "cancel", [
       orders
     ]);
   }
@@ -395,7 +395,7 @@ export class Seaport {
     const signer = this.provider.getSigner(offerer);
 
     return getTransactionMethods(
-      this.contract.connect(signer),
+      this.wallet?this.contract:this.contract.connect(signer),
       "incrementCounter",
       []
     );
@@ -414,7 +414,7 @@ export class Seaport {
   ): TransactionMethods<ContractMethodReturnType<SeaportContract, "validate">> {
     const signer = this.provider.getSigner(accountAddress);
 
-    return getTransactionMethods(this.contract.connect(signer), "validate", [
+    return getTransactionMethods(this.wallet?this.contract:this.contract.connect(signer), "validate", [
       orders
     ]);
   }
@@ -854,7 +854,7 @@ export class Seaport {
   }): TransactionMethods<ContractMethodReturnType<SeaportContract, "matchOrders">> {
     const signer = this.provider.getSigner(accountAddress);
 
-    return getTransactionMethods(this.contract.connect(signer), "matchOrders", [
+    return getTransactionMethods(this.wallet?this.contract:this.contract.connect(signer), "matchOrders", [
       orders,
       fulfillments,
       overrides

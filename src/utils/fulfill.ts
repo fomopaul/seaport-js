@@ -281,7 +281,7 @@ export async function fulfillBasicOrder({
   const exchangeAction = {
     type: "exchange",
     transactionMethods: getTransactionMethods(
-      seaportContract.connect(signer),
+      wallet?seaportContract:seaportContract.connect(signer),
       "fulfillBasicOrder",
       [basicOrderParameters, payableOverrides]
     )
@@ -426,7 +426,7 @@ export async function fulfillStandardOrder({
     type: "exchange",
     transactionMethods: useAdvanced
       ? getTransactionMethods(
-        seaportContract.connect(signer),
+        wallet?seaportContract:seaportContract.connect(signer),
         "fulfillAdvancedOrder",
         [
           {
@@ -447,7 +447,7 @@ export async function fulfillStandardOrder({
           payableOverrides
         ]
       )
-      : getTransactionMethods(seaportContract.connect(signer), "fulfillOrder", [
+      : getTransactionMethods(wallet?seaportContract:seaportContract.connect(signer), "fulfillOrder", [
         orderAccountingForTips,
         conduitKey,
         payableOverrides
@@ -670,7 +670,7 @@ export async function fulfillAvailableOrders({
   const exchangeAction = {
     type: "exchange",
     transactionMethods: getTransactionMethods(
-      seaportContract.connect(signer),
+      wallet?seaportContract:seaportContract.connect(signer),
       "fulfillAvailableAdvancedOrders",
       [
         advancedOrdersWithTips,
