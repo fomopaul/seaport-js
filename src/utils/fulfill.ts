@@ -1,35 +1,29 @@
-import {
-  BigNumber,
-  BigNumberish,
-  ContractTransaction,
-  ethers,
-  providers,
-} from "ethers";
+import { BigNumber, BigNumberish, ContractTransaction, ethers, providers, Wallet } from "ethers";
 import type {
-  Seaport as SeaportContract,
   BasicOrderParametersStruct,
-  Seaport,
   FulfillmentComponentStruct,
   OrderStruct,
+  Seaport as SeaportContract,
+  Seaport
 } from "../typechain/Seaport";
 import { BasicOrderRouteType, ItemType, NO_CONDUIT } from "../constants";
 import type {
   AdvancedOrder,
   ConsiderationItem,
+  ContractMethodReturnType,
   ExchangeAction,
   InputCriteria,
   Order,
   OrderParameters,
   OrderStatus,
-  OrderUseCase,
-  ContractMethodReturnType,
+  OrderUseCase
 } from "../types";
 import { getApprovalActions } from "./approval";
 import {
   BalancesAndApprovals,
   InsufficientApprovals,
   validateBasicFulfillBalancesAndApprovals,
-  validateStandardFulfillBalancesAndApprovals,
+  validateStandardFulfillBalancesAndApprovals
 } from "./balanceAndApprovalCheck";
 import { generateCriteriaResolvers, getItemToCriteriaMap } from "./criteria";
 import { gcd } from "./gcd";
@@ -40,13 +34,13 @@ import {
   isCurrencyItem,
   isErc721Item,
   isNativeCurrencyItem,
-  TimeBasedItemParams,
+  TimeBasedItemParams
 } from "./item";
 import {
   areAllCurrenciesSame,
   mapOrderAmountsFromFilledStatus,
   mapOrderAmountsFromUnitsToFill,
-  totalItemsAmount,
+  totalItemsAmount
 } from "./order";
 import { executeAllActions, getTransactionMethods } from "./usecase";
 
@@ -166,30 +160,31 @@ const offerAndConsiderationFulfillmentMapping: {
 } = {
   [ItemType.ERC20]: {
     [ItemType.ERC721]: BasicOrderRouteType.ERC721_TO_ERC20,
-    [ItemType.ERC1155]: BasicOrderRouteType.ERC1155_TO_ERC20,
+    [ItemType.ERC1155]: BasicOrderRouteType.ERC1155_TO_ERC20
   },
   [ItemType.ERC721]: {
     [ItemType.NATIVE]: BasicOrderRouteType.ETH_TO_ERC721,
-    [ItemType.ERC20]: BasicOrderRouteType.ERC20_TO_ERC721,
+    [ItemType.ERC20]: BasicOrderRouteType.ERC20_TO_ERC721
   },
   [ItemType.ERC1155]: {
     [ItemType.NATIVE]: BasicOrderRouteType.ETH_TO_ERC1155,
-    [ItemType.ERC20]: BasicOrderRouteType.ERC20_TO_ERC1155,
-  },
+    [ItemType.ERC20]: BasicOrderRouteType.ERC20_TO_ERC1155
+  }
 } as const;
 
 export async function fulfillBasicOrder({
-  order,
-  seaportContract,
-  offererBalancesAndApprovals,
-  fulfillerBalancesAndApprovals,
-  timeBasedItemParams,
-  offererOperator,
-  fulfillerOperator,
-  signer,
-  tips = [],
-  conduitKey = NO_CONDUIT,
-}: {
+                                          order,
+                                          seaportContract,
+                                          offererBalancesAndApprovals,
+                                          fulfillerBalancesAndApprovals,
+                                          timeBasedItemParams,
+                                          offererOperator,
+                                          fulfillerOperator,
+                                          signer,
+                                          wallet,
+                                          tips = [],
+                                          conduitKey = NO_CONDUIT
+                                        }: {
   order: Order;
   seaportContract: Seaport;
   offererBalancesAndApprovals: BalancesAndApprovals;
@@ -198,15 +193,10 @@ export async function fulfillBasicOrder({
   offererOperator: string;
   fulfillerOperator: string;
   signer: providers.JsonRpcSigner;
+  wallet?: Wallet;
   tips?: ConsiderationItem[];
   conduitKey: string;
-}): Promise<
-  OrderUseCase<
-    ExchangeAction<
-      ContractMethodReturnType<SeaportContract, "fulfillBasicOrder">
-    >
-  >
-> {
+}): Promise<OrderUseCase<ExchangeAction<ContractMethodReturnType<SeaportContract, "fulfillBasicOrder">>>> {
   const { offer, consideration } = order.parameters;
   const considerationIncludingTips = [...consideration, ...tips];
 
@@ -216,7 +206,7 @@ export async function fulfillBasicOrder({
   const basicOrderRouteType =
     offerAndConsiderationFulfillmentMapping[offerItem.itemType]?.[
       forOfferer.itemType
-    ];
+      ];
 
   if (basicOrderRouteType === undefined) {
     throw new Error(
@@ -227,7 +217,7 @@ export async function fulfillBasicOrder({
   const additionalRecipients = forAdditionalRecipients.map(
     ({ startAmount, recipient }) => ({
       amount: startAmount,
-      recipient,
+      recipient
     })
   );
 
@@ -240,8 +230,8 @@ export async function fulfillBasicOrder({
     criterias: [],
     timeBasedItemParams: {
       ...timeBasedItemParams,
-      isConsiderationItem: true,
-    },
+      isConsiderationItem: true
+    }
   })[ethers.constants.AddressZero]?.["0"];
 
   const insufficientApprovals = validateBasicFulfillBalancesAndApprovals({
@@ -251,7 +241,7 @@ export async function fulfillBasicOrder({
     fulfillerBalancesAndApprovals,
     timeBasedItemParams,
     offererOperator,
-    fulfillerOperator,
+    fulfillerOperator
   });
 
   const basicOrderParameters: BasicOrderParametersStruct = {
@@ -277,14 +267,15 @@ export async function fulfillBasicOrder({
     signature: order.signature,
     fulfillerConduitKey: conduitKey,
     additionalRecipients,
-    zoneHash: order.parameters.zoneHash,
+    zoneHash: order.parameters.zoneHash
   };
 
   const payableOverrides = { value: totalNativeAmount };
 
   const approvalActions = await getApprovalActions(
     insufficientApprovals,
-    signer
+    signer,
+    wallet
   );
 
   const exchangeAction = {
@@ -293,7 +284,7 @@ export async function fulfillBasicOrder({
       seaportContract.connect(signer),
       "fulfillBasicOrder",
       [basicOrderParameters, payableOverrides]
-    ),
+    )
   } as const;
 
   const actions = [...approvalActions, exchangeAction] as const;
@@ -301,29 +292,30 @@ export async function fulfillBasicOrder({
   return {
     actions,
     executeAllActions: () =>
-      executeAllActions(actions) as Promise<ContractTransaction>,
+      executeAllActions(actions) as Promise<ContractTransaction>
   };
 }
 
 export async function fulfillStandardOrder({
-  order,
-  unitsToFill = 0,
-  totalSize,
-  totalFilled,
-  offerCriteria,
-  considerationCriteria,
-  tips = [],
-  extraData,
-  seaportContract,
-  offererBalancesAndApprovals,
-  fulfillerBalancesAndApprovals,
-  offererOperator,
-  fulfillerOperator,
-  timeBasedItemParams,
-  conduitKey,
-  recipientAddress,
-  signer,
-}: {
+                                             order,
+                                             unitsToFill = 0,
+                                             totalSize,
+                                             totalFilled,
+                                             offerCriteria,
+                                             considerationCriteria,
+                                             tips = [],
+                                             extraData,
+                                             seaportContract,
+                                             offererBalancesAndApprovals,
+                                             fulfillerBalancesAndApprovals,
+                                             offererOperator,
+                                             fulfillerOperator,
+                                             timeBasedItemParams,
+                                             conduitKey,
+                                             recipientAddress,
+                                             signer,
+                                             wallet
+                                           }: {
   order: Order;
   unitsToFill?: BigNumberish;
   totalFilled: BigNumber;
@@ -341,32 +333,25 @@ export async function fulfillStandardOrder({
   recipientAddress: string;
   timeBasedItemParams: TimeBasedItemParams;
   signer: providers.JsonRpcSigner;
-}): Promise<
-  OrderUseCase<
-    ExchangeAction<
-      ContractMethodReturnType<
-        SeaportContract,
-        "fulfillAdvancedOrder" | "fulfillOrder"
-      >
-    >
-  >
-> {
+  wallet?: Wallet;
+}): Promise<OrderUseCase<ExchangeAction<ContractMethodReturnType<SeaportContract,
+  "fulfillAdvancedOrder" | "fulfillOrder">>>> {
   // If we are supplying units to fill, we adjust the order by the minimum of the amount to fill and
   // the remaining order left to be fulfilled
   const orderWithAdjustedFills = unitsToFill
     ? mapOrderAmountsFromUnitsToFill(order, {
-        unitsToFill,
-        totalFilled,
-        totalSize,
-      })
+      unitsToFill,
+      totalFilled,
+      totalSize
+    })
     : // Else, we adjust the order by the remaining order left to be fulfilled
-      mapOrderAmountsFromFilledStatus(order, {
-        totalFilled,
-        totalSize,
-      });
+    mapOrderAmountsFromFilledStatus(order, {
+      totalFilled,
+      totalSize
+    });
 
   const {
-    parameters: { offer, consideration },
+    parameters: { offer, consideration }
   } = orderWithAdjustedFills;
 
   const considerationIncludingTips = [...consideration, ...tips];
@@ -396,8 +381,8 @@ export async function fulfillStandardOrder({
     criterias: considerationCriteria,
     timeBasedItemParams: {
       ...timeBasedItemParams,
-      isConsiderationItem: true,
-    },
+      isConsiderationItem: true
+    }
   })[ethers.constants.AddressZero]?.["0"];
 
   const insufficientApprovals = validateStandardFulfillBalancesAndApprovals({
@@ -409,14 +394,14 @@ export async function fulfillStandardOrder({
     fulfillerBalancesAndApprovals,
     timeBasedItemParams,
     offererOperator,
-    fulfillerOperator,
+    fulfillerOperator
   });
 
   const payableOverrides = { value: totalNativeAmount };
 
   const approvalActions = await getApprovalActions(
     insufficientApprovals,
-    signer
+    signer, wallet
   );
 
   const isGift = recipientAddress !== ethers.constants.AddressZero;
@@ -428,8 +413,8 @@ export async function fulfillStandardOrder({
     parameters: {
       ...order.parameters,
       consideration: [...order.parameters.consideration, ...tips],
-      totalOriginalConsiderationItems: consideration.length,
-    },
+      totalOriginalConsiderationItems: consideration.length
+    }
   };
 
   const { numerator, denominator } = getAdvancedOrderNumeratorDenominator(
@@ -441,32 +426,32 @@ export async function fulfillStandardOrder({
     type: "exchange",
     transactionMethods: useAdvanced
       ? getTransactionMethods(
-          seaportContract.connect(signer),
-          "fulfillAdvancedOrder",
-          [
-            {
-              ...orderAccountingForTips,
-              numerator,
-              denominator,
-              extraData: extraData ?? "0x",
-            },
-            hasCriteriaItems
-              ? generateCriteriaResolvers({
-                  orders: [order],
-                  offerCriterias: [offerCriteria],
-                  considerationCriterias: [considerationCriteria],
-                })
-              : [],
-            conduitKey,
-            recipientAddress,
-            payableOverrides,
-          ]
-        )
-      : getTransactionMethods(seaportContract.connect(signer), "fulfillOrder", [
-          orderAccountingForTips,
+        seaportContract.connect(signer),
+        "fulfillAdvancedOrder",
+        [
+          {
+            ...orderAccountingForTips,
+            numerator,
+            denominator,
+            extraData: extraData ?? "0x"
+          },
+          hasCriteriaItems
+            ? generateCriteriaResolvers({
+              orders: [order],
+              offerCriterias: [offerCriteria],
+              considerationCriterias: [considerationCriteria]
+            })
+            : [],
           conduitKey,
-          payableOverrides,
-        ]),
+          recipientAddress,
+          payableOverrides
+        ]
+      )
+      : getTransactionMethods(seaportContract.connect(signer), "fulfillOrder", [
+        orderAccountingForTips,
+        conduitKey,
+        payableOverrides
+      ])
   } as const;
 
   const actions = [...approvalActions, exchangeAction] as const;
@@ -474,7 +459,7 @@ export async function fulfillStandardOrder({
   return {
     actions,
     executeAllActions: () =>
-      executeAllActions(actions) as Promise<ContractTransaction>,
+      executeAllActions(actions) as Promise<ContractTransaction>
   };
 }
 
@@ -513,16 +498,17 @@ export type FulfillOrdersMetadata = {
 }[];
 
 export async function fulfillAvailableOrders({
-  ordersMetadata,
-  seaportContract,
-  fulfillerBalancesAndApprovals,
-  fulfillerOperator,
-  currentBlockTimestamp,
-  ascendingAmountTimestampBuffer,
-  conduitKey,
-  signer,
-  recipientAddress,
-}: {
+                                               ordersMetadata,
+                                               seaportContract,
+                                               fulfillerBalancesAndApprovals,
+                                               fulfillerOperator,
+                                               currentBlockTimestamp,
+                                               ascendingAmountTimestampBuffer,
+                                               conduitKey,
+                                               signer,
+                                               wallet,
+                                               recipientAddress
+                                             }: {
   ordersMetadata: FulfillOrdersMetadata;
   seaportContract: Seaport;
   fulfillerBalancesAndApprovals: BalancesAndApprovals;
@@ -531,23 +517,16 @@ export async function fulfillAvailableOrders({
   ascendingAmountTimestampBuffer: number;
   conduitKey: string;
   signer: providers.JsonRpcSigner;
+  wallet?: Wallet;
   recipientAddress: string;
-}): Promise<
-  OrderUseCase<
-    ExchangeAction<
-      ContractMethodReturnType<
-        SeaportContract,
-        "fulfillAvailableAdvancedOrders"
-      >
-    >
-  >
-> {
+}): Promise<OrderUseCase<ExchangeAction<ContractMethodReturnType<SeaportContract,
+  "fulfillAvailableAdvancedOrders">>>> {
   const sanitizedOrdersMetadata = ordersMetadata.map((orderMetadata) => ({
     ...orderMetadata,
     order: validateAndSanitizeFromOrderStatus(
       orderMetadata.order,
       orderMetadata.orderStatus
-    ),
+    )
   }));
 
   const ordersMetadataWithAdjustedFills = sanitizedOrdersMetadata.map(
@@ -557,15 +536,15 @@ export async function fulfillAvailableOrders({
       // the remaining order left to be fulfilled
       order: orderMetadata.unitsToFill
         ? mapOrderAmountsFromUnitsToFill(orderMetadata.order, {
-            unitsToFill: orderMetadata.unitsToFill,
-            totalFilled: orderMetadata.orderStatus.totalFilled,
-            totalSize: orderMetadata.orderStatus.totalSize,
-          })
+          unitsToFill: orderMetadata.unitsToFill,
+          totalFilled: orderMetadata.orderStatus.totalFilled,
+          totalSize: orderMetadata.orderStatus.totalSize
+        })
         : // Else, we adjust the order by the remaining order left to be fulfilled
-          mapOrderAmountsFromFilledStatus(orderMetadata.order, {
-            totalFilled: orderMetadata.orderStatus.totalFilled,
-            totalSize: orderMetadata.orderStatus.totalSize,
-          }),
+        mapOrderAmountsFromFilledStatus(orderMetadata.order, {
+          totalFilled: orderMetadata.orderStatus.totalFilled,
+          totalSize: orderMetadata.orderStatus.totalSize
+        })
     })
   );
 
@@ -589,16 +568,16 @@ export async function fulfillAvailableOrders({
 
   ordersMetadataWithAdjustedFills.forEach(
     ({
-      order,
-      tips,
-      offerCriteria,
-      considerationCriteria,
-      offererBalancesAndApprovals,
-      offererOperator,
-    }) => {
+       order,
+       tips,
+       offerCriteria,
+       considerationCriteria,
+       offererBalancesAndApprovals,
+       offererOperator
+     }) => {
       const considerationIncludingTips = [
         ...order.parameters.consideration,
-        ...tips,
+        ...tips
       ];
 
       const timeBasedItemParams = {
@@ -606,14 +585,14 @@ export async function fulfillAvailableOrders({
         endTime: order.parameters.endTime,
         currentBlockTimestamp,
         ascendingAmountTimestampBuffer,
-        isConsiderationItem: true,
+        isConsiderationItem: true
       };
 
       totalNativeAmount = totalNativeAmount.add(
         getSummedTokenAndIdentifierAmounts({
           items: considerationIncludingTips,
           criterias: considerationCriteria,
-          timeBasedItemParams,
+          timeBasedItemParams
         })[ethers.constants.AddressZero]?.["0"] ?? BigNumber.from(0)
       );
 
@@ -627,7 +606,7 @@ export async function fulfillAvailableOrders({
           fulfillerBalancesAndApprovals,
           timeBasedItemParams,
           offererOperator,
-          fulfillerOperator,
+          fulfillerOperator
         }
       );
 
@@ -656,7 +635,7 @@ export async function fulfillAvailableOrders({
 
   const approvalActions = await getApprovalActions(
     totalInsufficientApprovals,
-    signer
+    signer, wallet
   );
 
   const advancedOrdersWithTips: AdvancedOrder[] = sanitizedOrdersMetadata.map(
@@ -668,7 +647,7 @@ export async function fulfillAvailableOrders({
 
       const considerationIncludingTips = [
         ...order.parameters.consideration,
-        ...tips,
+        ...tips
       ];
       return {
         ...order,
@@ -676,11 +655,11 @@ export async function fulfillAvailableOrders({
           ...order.parameters,
           consideration: considerationIncludingTips,
           totalOriginalConsiderationItems:
-            order.parameters.consideration.length,
+          order.parameters.consideration.length
         },
         numerator,
         denominator,
-        extraData,
+        extraData
       };
     }
   );
@@ -697,23 +676,23 @@ export async function fulfillAvailableOrders({
         advancedOrdersWithTips,
         hasCriteriaItems
           ? generateCriteriaResolvers({
-              orders: ordersMetadata.map(({ order }) => order),
-              offerCriterias: ordersMetadata.map(
-                ({ offerCriteria }) => offerCriteria
-              ),
-              considerationCriterias: ordersMetadata.map(
-                ({ considerationCriteria }) => considerationCriteria
-              ),
-            })
+            orders: ordersMetadata.map(({ order }) => order),
+            offerCriterias: ordersMetadata.map(
+              ({ offerCriteria }) => offerCriteria
+            ),
+            considerationCriterias: ordersMetadata.map(
+              ({ considerationCriteria }) => considerationCriteria
+            )
+          })
           : [],
         offerFulfillments,
         considerationFulfillments,
         conduitKey,
         recipientAddress,
         advancedOrdersWithTips.length,
-        payableOverrides,
+        payableOverrides
       ]
-    ),
+    )
   } as const;
 
   const actions = [...approvalActions, exchangeAction] as const;
@@ -721,7 +700,7 @@ export async function fulfillAvailableOrders({
   return {
     actions,
     executeAllActions: () =>
-      executeAllActions(actions) as Promise<ContractTransaction>,
+      executeAllActions(actions) as Promise<ContractTransaction>
   };
 }
 
@@ -732,26 +711,22 @@ export function generateFulfillOrdersFulfillments(
   considerationFulfillments: FulfillmentComponentStruct[];
 } {
   const hashAggregateKey = ({
-    sourceOrDestination,
-    operator = "",
-    token,
-    identifier,
-  }: {
+                              sourceOrDestination,
+                              operator = "",
+                              token,
+                              identifier
+                            }: {
     sourceOrDestination: string;
     operator?: string;
     token: string;
     identifier: string;
   }) => `${sourceOrDestination}-${operator}-${token}-${identifier}`;
 
-  const offerAggregatedFulfillments: Record<
-    string,
-    FulfillmentComponentStruct
-  > = {};
+  const offerAggregatedFulfillments: Record<string,
+    FulfillmentComponentStruct> = {};
 
-  const considerationAggregatedFulfillments: Record<
-    string,
-    FulfillmentComponentStruct
-  > = {};
+  const considerationAggregatedFulfillments: Record<string,
+    FulfillmentComponentStruct> = {};
 
   ordersMetadata.forEach(
     ({ order, offererOperator, offerCriteria }, orderIndex) => {
@@ -766,13 +741,13 @@ export function generateFulfillOrdersFulfillments(
           operator: offererOperator,
           token: item.token,
           identifier:
-            itemToCriteria.get(item)?.identifier ?? item.identifierOrCriteria,
+            itemToCriteria.get(item)?.identifier ?? item.identifierOrCriteria
           // We tack on the index to ensure that erc721s can never be aggregated and instead must be in separate arrays
         })}${isErc721Item(item.itemType) ? itemIndex : ""}`;
 
         offerAggregatedFulfillments[aggregateKey] = [
           ...(offerAggregatedFulfillments[aggregateKey] ?? []),
-          { orderIndex, itemIndex },
+          { orderIndex, itemIndex }
         ];
       });
     }
@@ -790,13 +765,13 @@ export function generateFulfillOrdersFulfillments(
             sourceOrDestination: item.recipient,
             token: item.token,
             identifier:
-              itemToCriteria.get(item)?.identifier ?? item.identifierOrCriteria,
+              itemToCriteria.get(item)?.identifier ?? item.identifierOrCriteria
             // We tack on the index to ensure that erc721s can never be aggregated and instead must be in separate arrays
           })}${isErc721Item(item.itemType) ? itemIndex : ""}`;
 
           considerationAggregatedFulfillments[aggregateKey] = [
             ...(considerationAggregatedFulfillments[aggregateKey] ?? []),
-            { orderIndex, itemIndex },
+            { orderIndex, itemIndex }
           ];
         }
       );
@@ -807,7 +782,7 @@ export function generateFulfillOrdersFulfillments(
     offerFulfillments: Object.values(offerAggregatedFulfillments),
     considerationFulfillments: Object.values(
       considerationAggregatedFulfillments
-    ),
+    )
   };
 }
 

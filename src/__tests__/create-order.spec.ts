@@ -516,7 +516,7 @@ describeWithFixture("As a user I want to create an order", (fixture) => {
     it("skips balance and approval validation if consideration config is set to skip on order creation", async () => {
       const { seaportContract, testErc721 } = fixture;
 
-      const seaport = new Seaport(ethers.provider, {
+      const seaport = new Seaport(ethers.provider, undefined,{
         balanceAndApprovalChecksOnOrderCreation: false,
         overrides: {
           contractAddress: seaportContract.address,

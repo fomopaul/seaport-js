@@ -43,7 +43,7 @@ export const describeWithFixture = (
 
       await seaportContract.deployed();
 
-      const seaport = new Seaport(ethers.provider, {
+      const seaport = new Seaport(ethers.provider, undefined,{
         overrides: {
           contractAddress: seaportContract.address,
         },

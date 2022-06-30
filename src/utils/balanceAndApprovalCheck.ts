@@ -1,5 +1,5 @@
 import { providers as multicallProviders } from "@0xsequence/multicall";
-import { BigNumber } from "ethers";
+import { BigNumber, Wallet } from "ethers";
 import { ItemType, MAX_INT } from "../constants";
 import type { InputCriteria, Item, OrderParameters } from "../types";
 import { approvedItemAmount } from "./approval";
@@ -67,12 +67,14 @@ export const getBalancesAndApprovals = async ({
   items,
   criterias,
   operator,
+  wallet,
   multicallProvider,
 }: {
   owner: string;
   items: Item[];
   criterias: InputCriteria[];
   operator: string;
+  wallet?: Wallet;
   multicallProvider: multicallProviders.MulticallProvider;
 }): Promise<BalancesAndApprovals> => {
   const itemToCriteria = getItemToCriteriaMap(items, criterias);
@@ -86,14 +88,14 @@ export const getBalancesAndApprovals = async ({
           owner,
           item,
           operator,
-          multicallProvider
+          multicallProvider, wallet
         );
       } else if (isErc20Item(item.itemType)) {
         approvedAmountPromise = approvedItemAmount(
           owner,
           item,
           operator,
-          multicallProvider
+          multicallProvider,wallet
         );
       }
       // If native token, we don't need to check for approvals

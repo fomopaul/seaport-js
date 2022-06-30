@@ -1,5 +1,5 @@
 import { providers as multicallProviders } from "@0xsequence/multicall";
-import { BigNumber, Contract, providers } from "ethers";
+import { BigNumber, Contract, providers, Wallet } from "ethers";
 import { ERC20ABI } from "../abi/ERC20";
 import { ERC721ABI } from "../abi/ERC721";
 import { ItemType, MAX_INT } from "../constants";
@@ -14,14 +14,14 @@ export const approvedItemAmount = async (
   owner: string,
   item: Item,
   operator: string,
-  multicallProvider: multicallProviders.MulticallProvider
+  multicallProvider: multicallProviders.MulticallProvider, wallet?:Wallet
 ) => {
   if (isErc721Item(item.itemType) || isErc1155Item(item.itemType)) {
     // isApprovedForAll check is the same for both ERC721 and ERC1155, defaulting to ERC721
     const contract = new Contract(
       item.token,
       ERC721ABI,
-      multicallProvider
+      wallet?wallet:multicallProvider
     ) as ERC721;
     return contract.isApprovedForAll(owner, operator).then((isApprovedForAll) =>
       // Setting to the max int to consolidate types and simplify
@@ -31,7 +31,7 @@ export const approvedItemAmount = async (
     const contract = new Contract(
       item.token,
       ERC20ABI,
-      multicallProvider
+      wallet?wallet:multicallProvider
     ) as ERC20;
 
     return contract.allowance(owner, operator);
@@ -46,7 +46,8 @@ export const approvedItemAmount = async (
  */
 export function getApprovalActions(
   insufficientApprovals: InsufficientApprovals,
-  signer: providers.JsonRpcSigner
+  signer: providers.JsonRpcSigner,
+  wallet?: Wallet,
 ): Promise<ApprovalAction[]> {
   return Promise.all(
     insufficientApprovals
@@ -58,7 +59,7 @@ export function getApprovalActions(
       .map(async ({ token, operator, itemType, identifierOrCriteria }) => {
         if (isErc721Item(itemType) || isErc1155Item(itemType)) {
           // setApprovalForAll check is the same for both ERC721 and ERC1155, defaulting to ERC721
-          const contract = new Contract(token, ERC721ABI, signer) as ERC721;
+          const contract = new Contract(token, ERC721ABI, wallet?wallet:signer) as ERC721;
 
           return {
             type: "approval",
@@ -67,13 +68,13 @@ export function getApprovalActions(
             itemType,
             operator,
             transactionMethods: getTransactionMethods(
-              contract.connect(signer),
+              wallet?contract:contract.connect(signer),
               "setApprovalForAll",
               [operator, true]
             ),
           };
         } else {
-          const contract = new Contract(token, ERC20ABI, signer) as ERC20;
+          const contract = new Contract(token, ERC20ABI, wallet?wallet:signer) as ERC20;
 
           return {
             type: "approval",
@@ -81,7 +82,7 @@ export function getApprovalActions(
             identifierOrCriteria,
             itemType,
             transactionMethods: getTransactionMethods(
-              contract.connect(signer),
+              wallet?contract:contract.connect(signer),
               "approve",
               [operator, MAX_INT]
             ),
