@@ -174,7 +174,7 @@ export class Seaport {
     }: CreateOrderInput,
     accountAddress?: string
   ): Promise<OrderUseCase<CreateOrderAction>> {
-    const signer = await this.provider.getSigner(accountAddress);
+    const signer = this.wallet ? this.wallet : await this.provider.getSigner(accountAddress);
     const offerer = await signer.getAddress();
     const offerItems = offer.map(mapInputItemToOfferItem);
     const considerationItems = [
@@ -263,7 +263,7 @@ export class Seaport {
       : [];
 
     const approvalActions = checkBalancesAndApprovals
-      ? await getApprovalActions(insufficientApprovals, signer, this.wallet)
+      ? await getApprovalActions(insufficientApprovals, signer)
       : [];
 
     const createOrderAction = {
@@ -347,7 +347,7 @@ export class Seaport {
     counter: number,
     accountAddress?: string
   ): Promise<string> {
-    const signer = this.provider.getSigner(accountAddress);
+    const signer = this.wallet ? this.wallet : this.provider.getSigner(accountAddress);
 
     const domainData = await this._getDomainData();
 
@@ -377,9 +377,9 @@ export class Seaport {
     orders: OrderComponents[],
     accountAddress?: string
   ): TransactionMethods<ContractMethodReturnType<SeaportContract, "cancel">> {
-    const signer = this.provider.getSigner(accountAddress);
+    const signer = this.wallet ? this.wallet : this.provider.getSigner(accountAddress);
 
-    return getTransactionMethods(this.wallet?this.contract:this.contract.connect(signer), "cancel", [
+    return getTransactionMethods(this.contract.connect(signer), "cancel", [
       orders
     ]);
   }
@@ -392,10 +392,10 @@ export class Seaport {
   public bulkCancelOrders(
     offerer?: string
   ): TransactionMethods<ContractMethodReturnType<SeaportContract, "incrementCounter">> {
-    const signer = this.provider.getSigner(offerer);
+    const signer = this.wallet ? this.wallet : this.provider.getSigner(offerer);
 
     return getTransactionMethods(
-      this.wallet?this.contract:this.contract.connect(signer),
+      this.contract.connect(signer),
       "incrementCounter",
       []
     );
@@ -412,9 +412,9 @@ export class Seaport {
     orders: Order[],
     accountAddress?: string
   ): TransactionMethods<ContractMethodReturnType<SeaportContract, "validate">> {
-    const signer = this.provider.getSigner(accountAddress);
+    const signer = this.wallet ? this.wallet : this.provider.getSigner(accountAddress);
 
-    return getTransactionMethods(this.wallet?this.contract:this.contract.connect(signer), "validate", [
+    return getTransactionMethods(this.contract.connect(signer), "validate", [
       orders
     ]);
   }
@@ -598,7 +598,7 @@ export class Seaport {
     const { parameters: orderParameters } = order;
     const { offerer, offer, consideration } = orderParameters;
 
-    const fulfiller = await this.provider.getSigner(accountAddress);
+    const fulfiller = this.wallet ? this.wallet : await this.provider.getSigner(accountAddress);
 
     const fulfillerAddress = await fulfiller.getAddress();
 
@@ -677,7 +677,6 @@ export class Seaport {
         offererOperator,
         fulfillerOperator,
         signer: fulfiller,
-        wallet: this.wallet,
         tips: tipConsiderationItems
       });
     }
@@ -700,7 +699,6 @@ export class Seaport {
       timeBasedItemParams,
       conduitKey,
       signer: fulfiller,
-      wallet: this.wallet,
       offererOperator,
       fulfillerOperator,
       recipientAddress
@@ -736,7 +734,7 @@ export class Seaport {
     conduitKey?: string;
     recipientAddress?: string;
   }) {
-    const fulfiller = await this.provider.getSigner(accountAddress);
+    const fulfiller = this.wallet ? this.wallet : await this.provider.getSigner(accountAddress);
 
     const fulfillerAddress = await fulfiller.getAddress();
 
@@ -824,7 +822,6 @@ export class Seaport {
       this.config.ascendingAmountFulfillmentBuffer,
       fulfillerOperator,
       signer: fulfiller,
-      wallet: this.wallet,
       conduitKey,
       recipientAddress
     });
@@ -852,9 +849,9 @@ export class Seaport {
     overrides?: PayableOverrides;
     accountAddress?: string;
   }): TransactionMethods<ContractMethodReturnType<SeaportContract, "matchOrders">> {
-    const signer = this.provider.getSigner(accountAddress);
+    const signer = this.wallet ? this.wallet : this.provider.getSigner(accountAddress);
 
-    return getTransactionMethods(this.wallet?this.contract:this.contract.connect(signer), "matchOrders", [
+    return getTransactionMethods(this.contract.connect(signer), "matchOrders", [
       orders,
       fulfillments,
       overrides

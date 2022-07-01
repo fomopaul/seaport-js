@@ -46,8 +46,7 @@ export const approvedItemAmount = async (
  */
 export function getApprovalActions(
   insufficientApprovals: InsufficientApprovals,
-  signer: providers.JsonRpcSigner,
-  wallet?: Wallet,
+  signer: providers.JsonRpcSigner | Wallet
 ): Promise<ApprovalAction[]> {
   return Promise.all(
     insufficientApprovals
@@ -59,7 +58,7 @@ export function getApprovalActions(
       .map(async ({ token, operator, itemType, identifierOrCriteria }) => {
         if (isErc721Item(itemType) || isErc1155Item(itemType)) {
           // setApprovalForAll check is the same for both ERC721 and ERC1155, defaulting to ERC721
-          const contract = new Contract(token, ERC721ABI, wallet?wallet:signer) as ERC721;
+          const contract = new Contract(token, ERC721ABI, signer) as ERC721;
 
           return {
             type: "approval",
@@ -68,13 +67,13 @@ export function getApprovalActions(
             itemType,
             operator,
             transactionMethods: getTransactionMethods(
-              wallet?contract:contract.connect(signer),
+              contract.connect(signer),
               "setApprovalForAll",
               [operator, true]
             ),
           };
         } else {
-          const contract = new Contract(token, ERC20ABI, wallet?wallet:signer) as ERC20;
+          const contract = new Contract(token, ERC20ABI, signer) as ERC20;
 
           return {
             type: "approval",
@@ -82,7 +81,7 @@ export function getApprovalActions(
             identifierOrCriteria,
             itemType,
             transactionMethods: getTransactionMethods(
-              wallet?contract:contract.connect(signer),
+              contract.connect(signer),
               "approve",
               [operator, MAX_INT]
             ),

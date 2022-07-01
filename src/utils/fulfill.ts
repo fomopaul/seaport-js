@@ -181,7 +181,6 @@ export async function fulfillBasicOrder({
                                           offererOperator,
                                           fulfillerOperator,
                                           signer,
-                                          wallet,
                                           tips = [],
                                           conduitKey = NO_CONDUIT
                                         }: {
@@ -192,8 +191,7 @@ export async function fulfillBasicOrder({
   timeBasedItemParams: TimeBasedItemParams;
   offererOperator: string;
   fulfillerOperator: string;
-  signer: providers.JsonRpcSigner;
-  wallet?: Wallet;
+  signer: providers.JsonRpcSigner | Wallet;
   tips?: ConsiderationItem[];
   conduitKey: string;
 }): Promise<OrderUseCase<ExchangeAction<ContractMethodReturnType<SeaportContract, "fulfillBasicOrder">>>> {
@@ -274,14 +272,13 @@ export async function fulfillBasicOrder({
 
   const approvalActions = await getApprovalActions(
     insufficientApprovals,
-    signer,
-    wallet
+    signer
   );
 
   const exchangeAction = {
     type: "exchange",
     transactionMethods: getTransactionMethods(
-      wallet?seaportContract:seaportContract.connect(signer),
+      seaportContract.connect(signer),
       "fulfillBasicOrder",
       [basicOrderParameters, payableOverrides]
     )
@@ -313,8 +310,7 @@ export async function fulfillStandardOrder({
                                              timeBasedItemParams,
                                              conduitKey,
                                              recipientAddress,
-                                             signer,
-                                             wallet
+                                             signer
                                            }: {
   order: Order;
   unitsToFill?: BigNumberish;
@@ -332,8 +328,7 @@ export async function fulfillStandardOrder({
   conduitKey: string;
   recipientAddress: string;
   timeBasedItemParams: TimeBasedItemParams;
-  signer: providers.JsonRpcSigner;
-  wallet?: Wallet;
+  signer: providers.JsonRpcSigner | Wallet;
 }): Promise<OrderUseCase<ExchangeAction<ContractMethodReturnType<SeaportContract,
   "fulfillAdvancedOrder" | "fulfillOrder">>>> {
   // If we are supplying units to fill, we adjust the order by the minimum of the amount to fill and
@@ -401,7 +396,7 @@ export async function fulfillStandardOrder({
 
   const approvalActions = await getApprovalActions(
     insufficientApprovals,
-    signer, wallet
+    signer
   );
 
   const isGift = recipientAddress !== ethers.constants.AddressZero;
@@ -426,7 +421,7 @@ export async function fulfillStandardOrder({
     type: "exchange",
     transactionMethods: useAdvanced
       ? getTransactionMethods(
-        wallet?seaportContract:seaportContract.connect(signer),
+        seaportContract.connect(signer),
         "fulfillAdvancedOrder",
         [
           {
@@ -447,7 +442,7 @@ export async function fulfillStandardOrder({
           payableOverrides
         ]
       )
-      : getTransactionMethods(wallet?seaportContract:seaportContract.connect(signer), "fulfillOrder", [
+      : getTransactionMethods(seaportContract.connect(signer), "fulfillOrder", [
         orderAccountingForTips,
         conduitKey,
         payableOverrides
@@ -506,7 +501,6 @@ export async function fulfillAvailableOrders({
                                                ascendingAmountTimestampBuffer,
                                                conduitKey,
                                                signer,
-                                               wallet,
                                                recipientAddress
                                              }: {
   ordersMetadata: FulfillOrdersMetadata;
@@ -516,8 +510,7 @@ export async function fulfillAvailableOrders({
   currentBlockTimestamp: number;
   ascendingAmountTimestampBuffer: number;
   conduitKey: string;
-  signer: providers.JsonRpcSigner;
-  wallet?: Wallet;
+  signer: providers.JsonRpcSigner | Wallet;
   recipientAddress: string;
 }): Promise<OrderUseCase<ExchangeAction<ContractMethodReturnType<SeaportContract,
   "fulfillAvailableAdvancedOrders">>>> {
@@ -635,7 +628,7 @@ export async function fulfillAvailableOrders({
 
   const approvalActions = await getApprovalActions(
     totalInsufficientApprovals,
-    signer, wallet
+    signer
   );
 
   const advancedOrdersWithTips: AdvancedOrder[] = sanitizedOrdersMetadata.map(
@@ -670,7 +663,7 @@ export async function fulfillAvailableOrders({
   const exchangeAction = {
     type: "exchange",
     transactionMethods: getTransactionMethods(
-      wallet?seaportContract:seaportContract.connect(signer),
+      seaportContract.connect(signer),
       "fulfillAvailableAdvancedOrders",
       [
         advancedOrdersWithTips,
